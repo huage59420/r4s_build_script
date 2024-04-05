@@ -6,6 +6,7 @@ export BLUE_COLOR='\e[1;34m'
 export PINK_COLOR='\e[1;35m'
 export SHAN='\e[1;33;5m'
 export RES='\e[0m'
+export BUILD_FAST=y
 
 GROUP=
 group() {
