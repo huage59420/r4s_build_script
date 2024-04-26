@@ -14,6 +14,10 @@ fi
 # config/Config-kernel.in patch
 curl -s https://$mirror/openwrt/patch/generic/0001-kernel-add-MODULE_ALLOW_BTF_MISMATCH-option.patch | patch -p1
 
+# rootfs: upx compression
+# include/rootfs.mk
+curl -s https://$mirror/openwrt/patch/generic/0002-rootfs-add-upx-compression-support.patch | patch -p1
+
 # meson: add platform variable to cross-compilation file
 curl -s https://$mirror/openwrt/patch/generic/010-meson-add-platform-variable-to-cross-compilation-file.patch | patch -p1
 
@@ -29,7 +33,7 @@ sed -i 's/noinitrd/noinitrd intel_pstate=disable/g' target/linux/x86/image/grub-
 sed -i 's/intel_pstate=disable/intel_pstate=disable mitigations=off/g' target/linux/x86/image/grub-efi.cfg
 
 # default LAN IP
-sed -i 's/192.168.1.1/10.0.0.1/g' package/base-files/files/bin/config_generate
+[ "$platform" != "bcm53xx" ] && sed -i 's/192.168.1.1/10.0.0.1/g' package/base-files/files/bin/config_generate
 
 # Use nginx instead of uhttpd
 if [ "$ENABLE_UHTTPD" != "y" ]; then
@@ -362,6 +366,9 @@ rm -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/statu
 
 # luci - rollback dhcp.js
 curl -s https://$mirror/openwrt/patch/luci/dhcp/dhcp.js > feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/dhcp.js
+
+# luci - disable wireless WPA3
+[ "$platform" = "bcm53xx" ] && sed -i -e '/if (has_ap_sae || has_sta_sae) {/{N;N;N;N;d;}' feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 
 # ppp - 2.5.0
 rm -rf package/network/services/ppp

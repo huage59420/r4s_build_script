@@ -69,7 +69,7 @@ if curl --help | grep progress-bar >/dev/null 2>&1; then
     CURL_BAR="--progress-bar";
 fi
 
-if [ -z "$1" ] || [ "$2" != "nanopi-r4s" -a "$2" != "nanopi-r5s" -a "$2" != "x86_64" ]; then
+if [ -z "$1" ] || [ "$2" != "nanopi-r4s" -a "$2" != "nanopi-r5s" -a "$2" != "x86_64"  -a "$2" != "netgear_r8500" ]; then
     echo -e "\n${RED_COLOR}Building type not specified.${RES}\n"
     echo -e "Usage:\n"
     echo -e "nanopi-r4s releases: ${GREEN_COLOR}bash build.sh rc2 nanopi-r4s${RES}"
@@ -77,7 +77,9 @@ if [ -z "$1" ] || [ "$2" != "nanopi-r4s" -a "$2" != "nanopi-r5s" -a "$2" != "x86
     echo -e "nanopi-r5s releases: ${GREEN_COLOR}bash build.sh rc2 nanopi-r5s${RES}"
     echo -e "nanopi-r5s snapshots: ${GREEN_COLOR}bash build.sh dev nanopi-r5s${RES}"
     echo -e "x86_64 releases: ${GREEN_COLOR}bash build.sh rc2 x86_64${RES}"
-    echo -e "x86_64 snapshots: ${GREEN_COLOR}bash build.sh dev x86_64${RES}\n"
+    echo -e "x86_64 snapshots: ${GREEN_COLOR}bash build.sh dev x86_64${RES}"
+    echo -e "netgear r8500 releases: ${GREEN_COLOR}bash build.sh rc2 netgear_r8500${RES}"
+    echo -e "netgear r8500 snapshots: ${GREEN_COLOR}bash build.sh dev netgear_r8500${RES}\n"
     exit 1
 fi
 
@@ -94,10 +96,10 @@ elif [ "$1" = "rc2" ]; then
 fi
 
 # platform
-export platform=$2
-[ "$platform" = "nanopi-r4s" ] && export platform="rk3399" toolchain_arch="nanopi-r4s"
-[ "$platform" = "nanopi-r5s" ] && export platform="rk3568" toolchain_arch="nanopi-r5s"
-[ "$platform" = "x86_64" ] && export platform="x86_64" toolchain_arch="x86_64"
+[ "$2" = "nanopi-r4s" ] && export platform="rk3399" toolchain_arch="nanopi-r4s"
+[ "$2" = "nanopi-r5s" ] && export platform="rk3568" toolchain_arch="nanopi-r5s"
+[ "$2" = "x86_64" ] && export platform="x86_64" toolchain_arch="x86_64"
+[ "$2" = "netgear_r8500" ] && export platform="bcm53xx" toolchain_arch="bcm53xx"
 
 # gcc13 & 14
 if [ "$USE_GCC13" = y ]; then
@@ -120,28 +122,20 @@ export ENABLE_LRNG=$ENABLE_LRNG
 echo -e "\r\n${GREEN_COLOR}Building $branch${RES}\r\n"
 if [ "$platform" = "x86_64" ]; then
     echo -e "${GREEN_COLOR}Model: x86_64${RES}"
-    curl -s https://$mirror/tags/kernel-6.6 > kernel.txt
-    kmod_hash=$(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}' | md5sum | awk '{print $1}')
-    kmodpkg_name=$(echo $(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}')-1-$(echo $kmod_hash))
-    echo -e "${GREEN_COLOR}Kernel: $kmodpkg_name ${RES}"
-    rm -f kernel.txt
+elif [ "$platform" = "bcm53xx" ]; then
+    echo -e "${GREEN_COLOR}Model: netgear_r8500${RES}"
 elif [ "$platform" = "rk3568" ]; then
     echo -e "${GREEN_COLOR}Model: nanopi-r5s/r5c${RES}"
     [ "$1" = "rc2" ] && model="nanopi-r5s"
-    curl -s https://$mirror/tags/kernel-6.6 > kernel.txt
-    kmod_hash=$(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}' | md5sum | awk '{print $1}')
-    kmodpkg_name=$(echo $(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}')-1-$(echo $kmod_hash))
-    echo -e "${GREEN_COLOR}Kernel: $kmodpkg_name ${RES}"
-    rm -f kernel.txt
 else
     echo -e "${GREEN_COLOR}Model: nanopi-r4s${RES}"
     [ "$1" = "rc2" ] && model="nanopi-r4s"
-    curl -s https://$mirror/tags/kernel-6.6 > kernel.txt
-    kmod_hash=$(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}' | md5sum | awk '{print $1}')
-    kmodpkg_name=$(echo $(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}')-1-$(echo $kmod_hash))
-    echo -e "${GREEN_COLOR}Kernel: $kmodpkg_name ${RES}"
-    rm -f kernel.txt
 fi
+curl -s https://$mirror/tags/kernel-6.6 > kernel.txt
+kmod_hash=$(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}' | md5sum | awk '{print $1}')
+kmodpkg_name=$(echo $(grep HASH kernel.txt | awk -F'HASH-' '{print $2}' | awk '{print $1}')-1-$(echo $kmod_hash))
+echo -e "${GREEN_COLOR}Kernel: $kmodpkg_name ${RES}"
+rm -f kernel.txt
 
 echo -e "${GREEN_COLOR}Date: $CURRENT_DATE${RES}\r\n"
 
@@ -246,7 +240,7 @@ bash 00-prepare_base.sh
 bash 02-prepare_package.sh
 bash 03-convert_translation.sh
 bash 05-fix-source.sh
-if [ "$platform" = "rk3568" ] || [ "$platform" = "rk3399" ] || [ "$platform" = "x86_64" ]; then
+if [ "$platform" = "rk3568" ] || [ "$platform" = "rk3399" ] || [ "$platform" = "x86_64" ] || [ "$platform" = "bcm53xx" ]; then
     bash 01-prepare_base-mainline.sh
     bash 04-fix_kmod.sh
 fi
@@ -264,6 +258,13 @@ rm -rf ../master
 if [ "$platform" = "x86_64" ]; then
     curl -s https://$mirror/openwrt/23-config-musl-x86 > .config
     ALL_KMODS=y
+elif [ "$platform" = "bcm53xx" ]; then
+    if [ "$MINIMAL_BUILD" = "y" ]; then
+        curl -s https://$mirror/openwrt/23-config-musl-r8500-minimal > .config
+    else
+        curl -s https://$mirror/openwrt/23-config-musl-r8500 > .config
+    fi
+    ALL_KMODS=y
 elif [ "$platform" = "rk3568" ]; then
     curl -s https://$mirror/openwrt/23-config-musl-r5s > .config
     ALL_KMODS=y
@@ -273,10 +274,10 @@ fi
 
 # config-common
 if [ "$MINIMAL_BUILD" = "y" ]; then
-    curl -s https://$mirror/openwrt/23-config-minimal-common >> .config
+    [ "$platform" != "bcm53xx" ] && curl -s https://$mirror/openwrt/23-config-minimal-common >> .config
     echo 'VERSION_TYPE="minimal"' >> package/base-files/files/usr/lib/os-release
 else
-    curl -s https://$mirror/openwrt/23-config-common >> .config
+    [ "$platform" != "bcm53xx" ] && curl -s https://$mirror/openwrt/23-config-common >> .config
 fi
 
 # ota
@@ -321,6 +322,9 @@ fi
 
 # uhttpd
 [ "$ENABLE_UHTTPD" = "y" ] && sed -i '/nginx/d' .config && echo 'CONFIG_PACKAGE_ariang=y' >> .config
+
+# bcm53xx: upx_list.txt
+# [ "$platform" = "bcm53xx" ] && curl -s https://$mirror/openwrt/generic/upx_list.txt > upx_list.txt
 
 # Toolchain Cache
 if [ "$BUILD_FAST" = "y" ]; then
@@ -422,6 +426,48 @@ EOF
         if [ "$isCN" = "CN" ] && [ "$1" = "rc2" ]; then
             rm -rf dl/geo* dl/go-mod-cache
             tar cf ../dl.gz dl
+        fi
+        exit 0
+    else
+        echo -e "\n${RED_COLOR} Build error... ${RES}"
+        echo -e " Build time: $(( SEC / 3600 ))h,$(( (SEC % 3600) / 60 ))m,$(( (SEC % 3600) % 60 ))s"
+        echo
+        exit 1
+    fi
+elif [ "$platform" = "bcm53xx" ]; then
+    if [ -f bin/targets/bcm53xx/generic/*netgear_r8500-squashfs.chk ]; then
+        echo -e "${GREEN_COLOR} Build success! ${RES}"
+        echo -e " Build time: $(( SEC / 3600 ))h,$(( (SEC % 3600) / 60 ))m,$(( (SEC % 3600) % 60 ))s"
+        if [ "$ALL_KMODS" = y ]; then
+            cp -a bin/targets/bcm53xx/generic/packages $kmodpkg_name
+            rm -f $kmodpkg_name/Packages*
+            # driver firmware
+            cp -a bin/packages/arm_cortex-a9/base/*firmware*.ipk $kmodpkg_name/
+            bash kmod-sign $kmodpkg_name
+            tar zcf bcm53xx-$kmodpkg_name.tar.gz $kmodpkg_name
+            rm -rf $kmodpkg_name
+        fi
+        # OTA json
+        if [ "$1" = "rc2" ]; then
+            mkdir -p ota
+            if [ "$MINIMAL_BUILD" = "y" ]; then
+                BUILD_TYPE=minimal
+            else
+                BUILD_TYPE=releases
+            fi
+            VERSION=$(sed 's/v//g' version.txt)
+            SHA256=$(sha256sum bin/targets/bcm53xx/generic/*-bcm53xx-generic-netgear_r8500-squashfs.chk | awk '{print $1}')
+            cat > ota/fw.json <<EOF
+{
+  "netgear,r8500": [
+    {
+      "build_date": "$CURRENT_DATE",
+      "sha256sum": "$SHA256",
+      "url": "https://r8500.cooluc.com/$BUILD_TYPE/openwrt-23.05/v$VERSION/openwrt-$VERSION-bcm53xx-generic-netgear_r8500-squashfs.chk"
+    }
+  ]
+}
+EOF
         fi
         exit 0
     else
