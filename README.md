@@ -46,7 +46,16 @@ sudo apt-get install -y clang-15
 
 ---------------
 
-### 启用 [glibc](https://www.gnu.org/software/libc/) （测试）
+### 启用 [Clang/LLVM](https://docs.kernel.org/kbuild/llvm.html) 构建内核
+##### 脚本支持使用 Clang/LLVM 构建内核，NanoPi & X86_64 设备将同时启用 LLVM LTO 链接时优化，这会增加编译的时间，但会获得更优的性能
+##### 编译环境需要安装 Clang/LLVM 工具链，推荐使用 clang 16-18 版本
+##### 只需在构建固件前执行以下命令即可启用 Clang/LLVM 构建内核与内核模块
+
+```
+export KERNEL_CLANG_LTO=y
+```
+
+### 启用 [glibc](https://www.gnu.org/software/libc/) （实验性）
 ##### 脚本支持使用 glibc 库进行构建，当启用 glibc 进行构建时，构建的固件将会同时兼容 musl/glibc 的预构建二进制程序
 ##### 只需在构建固件前执行以下命令即可启用 glibc 构建
 
@@ -54,8 +63,8 @@ sudo apt-get install -y clang-15
 export USE_GLIBC=y
 ```
 
-### 启用 [GCC13](https://gcc.gnu.org/gcc-13/)/[GCC14](https://gcc.gnu.org/gcc-14/) 工具链编译
-##### 只需在构建固件前执行以下命令即可启用 GCC13/GCC14 工具链
+### 启用 [GCC13](https://gcc.gnu.org/gcc-13/)/[GCC14](https://gcc.gnu.org/gcc-14/)/[GCC15](https://gcc.gnu.org/gcc-15/) 工具链编译
+##### 只需在构建固件前执行以下命令即可启用 GCC13/GCC14/GCC15 交叉工具链
 
 ```
 # GCC13
@@ -67,6 +76,11 @@ export USE_GCC13=y
 export USE_GCC14=y
 ```
 
+```
+# GCC15
+export USE_GCC15=y
+```
+
 ### 启用 [LTO](https://gcc.gnu.org/onlinedocs/gccint/LTO-Overview.html) 优化
 ##### 只需在构建固件前执行以下命令即可启用编译器 LTO 优化
 
@@ -74,7 +88,7 @@ export USE_GCC14=y
 export ENABLE_LTO=y
 ```
 
-### 启用 [MOLD](https://github.com/rui314/mold) 现代链接器（需要启用 `USE_GCC13=y` 或 `USE_GCC14=y`）
+### 启用 [MOLD](https://github.com/rui314/mold) 现代链接器（需要启用 `USE_GCC13=y` 或 `USE_GCC14=y` 或 `USE_GCC15=y`）
 ##### 只需在构建固件前执行以下命令即可启用 MOLD 链接，如果使用它建议同时启用 LTO 优化
 
 ```
@@ -109,6 +123,14 @@ export BUILD_FAST=y
 
 ```
 export MINIMAL_BUILD=y
+```
+
+### 更改 LAN IP 地址
+##### 自定义默认 LAN IP 地址
+##### 只需在构建固件前执行以下命令即可覆盖默认 LAN 地址（默认：10.0.0.1）
+
+```
+export LAN=10.0.0.1
 ```
 
 ---------------

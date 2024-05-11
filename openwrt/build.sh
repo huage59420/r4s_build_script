@@ -95,19 +95,26 @@ elif [ "$1" = "rc2" ]; then
     export toolchain_version=openwrt-23.05
 fi
 
+# lan
+[ -n "$LAN" ] && export LAN=$LAN || export LAN=10.0.0.1
+
 # platform
 [ "$2" = "nanopi-r4s" ] && export platform="rk3399" toolchain_arch="nanopi-r4s"
 [ "$2" = "nanopi-r5s" ] && export platform="rk3568" toolchain_arch="nanopi-r5s"
 [ "$2" = "x86_64" ] && export platform="x86_64" toolchain_arch="x86_64"
 [ "$2" = "netgear_r8500" ] && export platform="bcm53xx" toolchain_arch="bcm53xx"
 
-# gcc13 & 14
+# gcc13 & 14 & 15
 if [ "$USE_GCC13" = y ]; then
     export USE_GCC13=y
     # use mold
     [ "$USE_MOLD" = y ] && USE_MOLD=y
 elif [ "$USE_GCC14" = y ]; then
     export USE_GCC14=y
+    # use mold
+    [ "$USE_MOLD" = y ] && USE_MOLD=y
+elif [ "$USE_GCC15" = y ]; then
+    export USE_GCC15=y
     # use mold
     [ "$USE_MOLD" = y ] && USE_MOLD=y
 fi
@@ -118,12 +125,16 @@ export USE_GLIBC=$USE_GLIBC
 # lrng
 export ENABLE_LRNG=$ENABLE_LRNG
 
+# kernel build with clang lto
+export KERNEL_CLANG_LTO=$KERNEL_CLANG_LTO
+
 # print version
 echo -e "\r\n${GREEN_COLOR}Building $branch${RES}\r\n"
 if [ "$platform" = "x86_64" ]; then
     echo -e "${GREEN_COLOR}Model: x86_64${RES}"
 elif [ "$platform" = "bcm53xx" ]; then
     echo -e "${GREEN_COLOR}Model: netgear_r8500${RES}"
+    [ -z "$LAN" ] && export LAN="192.168.1.1"
 elif [ "$platform" = "rk3568" ]; then
     echo -e "${GREEN_COLOR}Model: nanopi-r5s/r5c${RES}"
     [ "$1" = "rc2" ] && model="nanopi-r5s"
@@ -143,16 +154,20 @@ if [ "$USE_GCC13" = "y" ]; then
     echo -e "${GREEN_COLOR}GCC VERSION: 13${RES}"
 elif [ "$USE_GCC14" = "y" ]; then
     echo -e "${GREEN_COLOR}GCC VERSION: 14${RES}"
+elif [ "$USE_GCC15" = "y" ]; then
+    echo -e "${GREEN_COLOR}GCC VERSION: 15${RES}"
 else
     echo -e "${GREEN_COLOR}GCC VERSION: 11${RES}"
 fi
+[ -n "$LAN" ] && echo -e "${GREEN_COLOR}LAN: $LAN${RES}" || echo -e "${GREEN_COLOR}LAN: 10.0.0.1${RES}"
 [ "$USE_MOLD" = "y" ] && echo -e "${GREEN_COLOR}USE_MOLD: true${RES}" || echo -e "${GREEN_COLOR}USE_MOLD: false${RES}"
 [ "$ENABLE_OTA" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_OTA: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_OTA: false${RES}"
 [ "$ENABLE_BPF" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_BPF: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_BPF: false${RES}"
 [ "$ENABLE_LTO" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_LTO: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_LTO: false${RES}"
 [ "$ENABLE_LRNG" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_LRNG: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_LRNG: false${RES}"
 [ "$BUILD_FAST" = "y" ] && echo -e "${GREEN_COLOR}BUILD_FAST: true${RES}" || echo -e "${GREEN_COLOR}BUILD_FAST: false${RES}"
-[ "$MINIMAL_BUILD" = "y" ] && echo -e "${GREEN_COLOR}MINIMAL_BUILD: true${RES}\r\n" || echo -e "${GREEN_COLOR}MINIMAL_BUILD: false${RES}\r\n"
+[ "$MINIMAL_BUILD" = "y" ] && echo -e "${GREEN_COLOR}MINIMAL_BUILD: true${RES}" || echo -e "${GREEN_COLOR}MINIMAL_BUILD: false${RES}"
+[ "$KERNEL_CLANG_LTO" = "y" ] && echo -e "${GREEN_COLOR}KERNEL_CLANG_LTO: true${RES}\r\n" || echo -e "${GREEN_COLOR}KERNEL_CLANG_LTO: false${RES}\r\n"
 
 # clean old files
 rm -rf openwrt master && mkdir master
@@ -246,7 +261,7 @@ if [ "$platform" = "rk3568" ] || [ "$platform" = "rk3399" ] || [ "$platform" = "
 fi
 [ "$(whoami)" = "runner" ] && endgroup
 
-if [ "$USE_GCC14" = "y" ]; then
+if [ "$USE_GCC14" = "y" ] || [ "$USE_GCC15" = "y" ]; then
     rm -rf toolchain/binutils
     cp -a ../master/openwrt/toolchain/binutils toolchain/binutils
 fi
@@ -300,18 +315,25 @@ export ENABLE_LTO=$ENABLE_LTO
 # mold
 [ "$USE_MOLD" = "y" ] && echo 'CONFIG_USE_MOLD=y' >> .config
 
-# openwrt-23.05 gcc11/13/14
+# clang
+if [ "$KERNEL_CLANG_LTO" = "y" ]; then
+    curl -s https://$mirror/openwrt/generic/config-clang >> .config
+fi
+
+# openwrt-23.05 gcc11/13/14/15
 [ "$(whoami)" = "runner" ] && group "patching toolchain"
-if [ "$USE_GCC13" = "y" ] || [ "$USE_GCC14" = "y" ]; then
+if [ "$USE_GCC13" = "y" ] || [ "$USE_GCC14" = "y" ] || [ "$USE_GCC15" = "y" ]; then
     [ "$USE_GCC13" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc13 >> .config
     [ "$USE_GCC14" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc14 >> .config
+    [ "$USE_GCC15" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc15 >> .config
     curl -s https://$mirror/openwrt/patch/generic/200-toolchain-gcc-update-to-13.2.patch | patch -p1
     curl -s https://$mirror/openwrt/patch/generic/201-toolchain-gcc-add-support-for-GCC-14.patch | patch -p1
-    if [ "$USE_GCC14" = "y" ]; then
-        cp -a toolchain/gcc/patches-13.x toolchain/gcc/patches-14.x
-        curl -s https://$mirror/openwrt/patch/generic/gcc-14/910-mbsd_multi.patch > toolchain/gcc/patches-14.x/910-mbsd_multi.patch
-        curl -s https://$mirror/openwrt/patch/generic/gcc-14/990-libatomic-Fix-build-for---disable-gnu-indirect-function-PR113986.patch > toolchain/gcc/patches-14.x/990-libatomic-Fix-build-for---disable-gnu-indirect-function-PR113986.patch
-    fi
+    curl -s https://$mirror/openwrt/patch/generic/202-toolchain-gcc-add-support-for-GCC-15.patch | patch -p1
+    # gcc14/15 init
+    cp -a toolchain/gcc/patches-13.x toolchain/gcc/patches-14.x
+    curl -s https://$mirror/openwrt/patch/generic/gcc-14/910-mbsd_multi.patch > toolchain/gcc/patches-14.x/910-mbsd_multi.patch
+    cp -a toolchain/gcc/patches-14.x toolchain/gcc/patches-15.x
+    curl -s https://$mirror/openwrt/patch/generic/gcc-15/970-macos_arm64-building-fix.patch > toolchain/gcc/patches-15.x/970-macos_arm64-building-fix.patch
 elif [ ! "$USE_GLIBC" = "y" ]; then
     curl -s https://$mirror/openwrt/generic/config-gcc11 >> .config
 fi
@@ -342,6 +364,8 @@ if [ "$BUILD_FAST" = "y" ]; then
         curl -L "$TOOLCHAIN_URL"/toolchain_"$LIBC"_"$toolchain_arch"_13.tar.gz -o toolchain.tar.gz $CURL_BAR
     elif [ "$USE_GCC14" = "y" ]; then
         curl -L "$TOOLCHAIN_URL"/toolchain_"$LIBC"_"$toolchain_arch"_14.tar.gz -o toolchain.tar.gz $CURL_BAR
+    elif [ "$USE_GCC15" = "y" ]; then
+        curl -L "$TOOLCHAIN_URL"/toolchain_"$LIBC"_"$toolchain_arch"_15.tar.gz -o toolchain.tar.gz $CURL_BAR
     else
         curl -L "$TOOLCHAIN_URL"/toolchain_"$LIBC"_"$toolchain_arch".tar.gz -o toolchain.tar.gz $CURL_BAR
     fi
@@ -370,6 +394,8 @@ if [ "$BUILD_TOOLCHAIN" = "y" ]; then
         tar -zcf toolchain-cache/toolchain_"$LIBC"_"$toolchain_arch"_13.tar.gz ./{build_dir,dl,staging_dir,tmp} && echo -e "${GREEN_COLOR} Build success! ${RES}"
     elif [ "$USE_GCC14" = "y" ]; then
         tar -zcf toolchain-cache/toolchain_"$LIBC"_"$toolchain_arch"_14.tar.gz ./{build_dir,dl,staging_dir,tmp} && echo -e "${GREEN_COLOR} Build success! ${RES}"
+    elif [ "$USE_GCC15" = "y" ]; then
+        tar -zcf toolchain-cache/toolchain_"$LIBC"_"$toolchain_arch"_15.tar.gz ./{build_dir,dl,staging_dir,tmp} && echo -e "${GREEN_COLOR} Build success! ${RES}"
     else
         tar -zcf toolchain-cache/toolchain_"$LIBC"_"$toolchain_arch".tar.gz ./{build_dir,dl,staging_dir,tmp} && echo -e "${GREEN_COLOR} Build success! ${RES}"
     fi
@@ -378,7 +404,7 @@ else
     echo -e "\r\n${GREEN_COLOR}Building OpenWrt ...${RES}\r\n"
     sed -i "/BUILD_DATE/d" package/base-files/files/usr/lib/os-release
     sed -i "/BUILD_ID/aBUILD_DATE=\"$CURRENT_DATE\"" package/base-files/files/usr/lib/os-release
-    make -j$cores
+    make -j$cores IGNORE_ERRORS="n m"
 fi
 
 # Compile time

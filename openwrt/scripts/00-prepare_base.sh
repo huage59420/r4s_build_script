@@ -18,6 +18,9 @@ curl -s https://$mirror/openwrt/patch/generic/0001-kernel-add-MODULE_ALLOW_BTF_M
 # include/rootfs.mk
 curl -s https://$mirror/openwrt/patch/generic/0002-rootfs-add-upx-compression-support.patch | patch -p1
 
+# kernel: Add support for llvm/clang compiler
+curl -s https://$mirror/openwrt/patch/generic/0003-kernel-Add-support-for-llvm-clang-compiler.patch | patch -p1
+
 # meson: add platform variable to cross-compilation file
 curl -s https://$mirror/openwrt/patch/generic/010-meson-add-platform-variable-to-cross-compilation-file.patch | patch -p1
 
@@ -33,7 +36,7 @@ sed -i 's/noinitrd/noinitrd intel_pstate=disable/g' target/linux/x86/image/grub-
 sed -i 's/intel_pstate=disable/intel_pstate=disable mitigations=off/g' target/linux/x86/image/grub-efi.cfg
 
 # default LAN IP
-[ "$platform" != "bcm53xx" ] && sed -i 's/192.168.1.1/10.0.0.1/g' package/base-files/files/bin/config_generate
+sed -i "s/192.168.1.1/$LAN/g" package/base-files/files/bin/config_generate
 
 # Use nginx instead of uhttpd
 if [ "$ENABLE_UHTTPD" != "y" ]; then
@@ -92,15 +95,13 @@ if [ "$USE_MOLD" = "y" ]; then
     curl -s https://$mirror/openwrt/patch/openwrt-6.x/mold/0005-build-replace-SSTRIP_ARGS-with-SSTRIP_DISCARD_TRAILI.patch | patch -p1
     curl -s https://$mirror/openwrt/patch/openwrt-6.x/mold/0006-config-add-a-knob-to-use-the-mold-linker-for-package.patch | patch -p1
     curl -s https://$mirror/openwrt/patch/openwrt-6.x/mold/0007-rules-prepare-to-use-different-linkers.patch | patch -p1
-    curl -s https://$mirror/openwrt/patch/openwrt-6.x/mold/0008-tools-mold-update-to-2.4.0.patch | patch -p1
+    curl -s https://$mirror/openwrt/patch/openwrt-6.x/mold/0008-tools-mold-update-to-2.30.0.patch | patch -p1
     # no-mold
     sed -i '/PKG_BUILD_PARALLEL/aPKG_BUILD_FLAGS:=no-mold' feeds/packages/utils/attr/Makefile
 fi
 
 # Mbedtls AES & GCM Crypto Extensions
 if [ ! "$platform" = "x86_64" ]; then
-    rm -rf package/libs/mbedtls
-    cp -a ../master/openwrt/package/libs/mbedtls package/libs/mbedtls
     curl -s https://$mirror/openwrt/patch/mbedtls-23.05/200-Implements-AES-and-GCM-with-ARMv8-Crypto-Extensions.patch > package/libs/mbedtls/patches/200-Implements-AES-and-GCM-with-ARMv8-Crypto-Extensions.patch
     curl -s https://$mirror/openwrt/patch/mbedtls-23.05/mbedtls.patch | patch -p1
 fi
@@ -262,10 +263,11 @@ curl -s https://$mirror/openwrt/patch/user-agent/999-wget-default-useragent.patc
 rm -rf feeds/luci/applications/luci-app-dockerman
 git clone https://$gitea/sbwml/luci-app-dockerman -b openwrt-23.05 feeds/luci/applications/luci-app-dockerman
 if [ "$version" = "snapshots-23.05" ] || [ "$version" = "rc2" ]; then
-    rm -rf feeds/packages/utils/docker feeds/packages/utils/dockerd feeds/packages/utils/containerd feeds/packages/utils/runc
-    cp -a ../master/packages/utils/docker feeds/packages/utils/docker
-    cp -a ../master/packages/utils/dockerd feeds/packages/utils/dockerd
-    cp -a ../master/packages/utils/containerd feeds/packages/utils/containerd
+    rm -rf feeds/packages/utils/docker feeds/packages/utils/dockerd feeds/packages/utils/docker-compose feeds/packages/utils/containerd feeds/packages/utils/runc
+    git clone https://$gitea/sbwml/packages_utils_docker feeds/packages/utils/docker
+    git clone https://$gitea/sbwml/packages_utils_dockerd feeds/packages/utils/dockerd
+    git clone https://$gitea/sbwml/packages_utils_containerd feeds/packages/utils/containerd
+    cp -a ../master/packages/utils/docker-compose feeds/packages/utils/docker-compose
     cp -a ../master/packages/utils/runc feeds/packages/utils/runc
 fi
 sed -i '/sysctl.d/d' feeds/packages/utils/dockerd/Makefile

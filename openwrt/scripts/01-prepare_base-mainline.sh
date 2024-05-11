@@ -5,7 +5,6 @@
 # Rockchip - target - r4s/r5s only
 rm -rf target/linux/rockchip
 git clone https://nanopi:nanopi@$gitea/sbwml/target_linux_rockchip-6.x target/linux/rockchip -b linux-6.6
-[ "$platform" = "rk3568" ] && sed -i 's/CONFIG_PREEMPT=y/CONFIG_PREEMPT_DYNAMIC=y/g' target/linux/rockchip/armv8/config-6.6
 
 # x86_64 - target
 curl -s https://$mirror/openwrt/patch/openwrt-6.x/x86/64/config-6.6 > target/linux/x86/64/config-6.6
@@ -34,6 +33,22 @@ grep HASH include/kernel-6.6 | awk -F'HASH-' '{print $2}' | awk '{print $1}' | m
 # kernel generic patches
 rm -rf target/linux/generic
 git clone https://$github/sbwml/target_linux_generic -b main target/linux/generic
+
+# bcm53xx - fix build kernel with clang
+[ "$platform" = "bcm53xx" ] && [ "$KERNEL_CLANG_LTO" = "y" ] && rm -f target/linux/generic/hack-6.6/220-arm-gc_sections.patch
+
+# kernel - clang lto
+if [ "$KERNEL_CLANG_LTO" = "y" ]; then
+    echo 'CONFIG_LTO=y' >> target/linux/generic/config-6.6
+    echo 'CONFIG_LTO_CLANG=y' >> target/linux/generic/config-6.6
+    echo 'CONFIG_LTO_CLANG_FULL=y' >> target/linux/generic/config-6.6
+    echo 'CONFIG_HAS_LTO_CLANG=y' >> target/linux/generic/config-6.6
+    echo 'CONFIG_RANDSTRUCT_NONE=y' >> target/linux/generic/config-6.6
+    echo '# CONFIG_CFI_CLANG is not set' >> target/linux/generic/config-6.6
+    echo '# CONFIG_LTO_NONE is not set' >> target/linux/generic/config-6.6
+    echo '# CONFIG_RANDSTRUCT_FULL is not set' >> target/linux/generic/config-6.6
+    echo '# CONFIG_RELR is not set' >> target/linux/generic/config-6.6
+fi
 
 # kernel modules
 rm -rf package/kernel/linux
@@ -141,9 +156,6 @@ cp -a ../master/openwrt/package/kernel/rtl8812au-ct package/kernel/rtl8812au-ct
 
 # add rtl8812au-ac
 git clone https://$github/sbwml/package_kernel_rtl8812au-ac package/kernel/rtl8812au-ac
-
-# ath10k-ct - fix mac80211 6.1-rc
-curl -s https://$mirror/openwrt/patch/openwrt-6.x/kmod-patches/ath10k-ct.patch | patch -p1
 
 # mt76 - main
 rm -rf package/kernel/mt76
